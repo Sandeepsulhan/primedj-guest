@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrimeDJ — Request. Tip. Connect.</title>
+  <script src="https://js.stripe.com/v3/"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --pink: #ff006f; --purple: #7c3aed; --cyan: #00d4ff; --green: #00ff88; --bg: #050508; }
+    body { background: var(--bg); color: white; font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; min-height: 100vh; overflow-x: hidden; }
+
+    #homePage { display: none; min-height: 100vh; position: relative; overflow: hidden; }
+    .home-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+    .home-bg::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 60% 50% at 15% 40%, #ff006f33 0%, transparent 60%), radial-gradient(ellipse 50% 60% at 85% 20%, #7c3aed33 0%, transparent 60%), radial-gradient(ellipse 40% 40% at 50% 90%, #00d4ff1a 0%, transparent 60%); animation: bgPulse 10s ease-in-out infinite alternate; }
+    .home-bg::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, #ffffff04 2px, #ffffff04 4px); pointer-events: none; }
+    @keyframes bgPulse { 0% { opacity: 0.6; transform: scale(1); } 100% { opacity: 1; transform: scale(1.05); } }
+    .home-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 0 24px; }
+    .home-nav { width: 100%; max-width: 900px; display: flex; justify-content: space-between; align-items: center; padding: 28px 0 0; }
+    .nav-logo { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 4px; background: linear-gradient(135deg, var(--pink), var(--purple), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .nav-dj-btn { background: transparent; border: 1px solid #ffffff33; border-radius: 100px; color: #ffffffcc; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700; padding: 10px 22px; cursor: pointer; letter-spacing: 1px; transition: all 0.3s; text-decoration: none; display: inline-block; }
+    .nav-dj-btn:hover { border-color: var(--green); color: var(--green); box-shadow: 0 0 20px #00ff8833; }
+    .hero { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 60px 0 40px; max-width: 700px; }
+    .hero-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; color: var(--green); margin-bottom: 24px; animation: fadeUp 0.8s ease both; }
+    .hero-title { font-family: 'Bebas Neue', sans-serif; font-size: clamp(72px, 18vw, 140px); line-height: 0.9; letter-spacing: 6px; margin-bottom: 8px; animation: fadeUp 0.8s 0.1s ease both; }
+    .hero-title span.grad { background: linear-gradient(135deg, var(--pink), var(--purple), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; filter: drop-shadow(0 0 30px #ff006f66); }
+    .hero-sub { font-size: clamp(14px, 4vw, 18px); color: #ffffff77; margin-bottom: 48px; line-height: 1.6; letter-spacing: 0.5px; animation: fadeUp 0.8s 0.2s ease both; }
+    .hero-sub strong { color: #ffffffcc; font-weight: 700; }
+    .qr-card { background: #ffffff08; border: 1px solid #ffffff15; border-radius: 28px; padding: 36px 32px; max-width: 420px; width: 100%; backdrop-filter: blur(20px); animation: fadeUp 0.8s 0.3s ease both; box-shadow: 0 0 60px #7c3aed11, inset 0 1px 0 #ffffff11; }
+    .qr-icon { font-size: 64px; margin-bottom: 16px; display: block; animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+    .qr-card h2 { font-family: 'Bebas Neue', sans-serif; font-size: 32px; letter-spacing: 3px; margin-bottom: 10px; color: white; }
+    .qr-card p { font-size: 15px; color: #ffffff66; line-height: 1.7; margin-bottom: 28px; }
+    .qr-card p strong { color: #ffffffaa; }
+    .pill-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 28px; }
+    .pill { background: #ffffff0d; border: 1px solid #ffffff1a; border-radius: 100px; color: #ffffffaa; font-size: 12px; font-weight: 700; padding: 8px 18px; letter-spacing: 1px; }
+    .pill.green { border-color: #00ff8844; color: var(--green); } .pill.pink { border-color: #ff006f44; color: var(--pink); } .pill.cyan { border-color: #00d4ff44; color: var(--cyan); }
+    .dj-cta { width: 100%; background: linear-gradient(135deg, var(--green), #00cc66); border: none; border-radius: 16px; color: #000; font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 800; padding: 18px; cursor: pointer; letter-spacing: 1px; text-transform: uppercase; box-shadow: 0 4px 30px #00ff8833; transition: all 0.3s; text-decoration: none; display: block; text-align: center; }
+    .dj-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 40px #00ff8855; }
+    .eq-home { display: flex; align-items: flex-end; gap: 4px; justify-content: center; height: 28px; margin-top: 28px; opacity: 0.4; animation: fadeUp 0.8s 0.5s ease both; }
+    .eq-home .bar { width: 4px; border-radius: 3px; background: linear-gradient(to top, var(--pink), var(--purple)); animation: eqAnim 0.7s ease-in-out infinite alternate; }
+    .eq-home .bar:nth-child(1) { animation-delay: 0.0s; } .eq-home .bar:nth-child(2) { animation-delay: 0.1s; } .eq-home .bar:nth-child(3) { animation-delay: 0.2s; } .eq-home .bar:nth-child(4) { animation-delay: 0.15s; } .eq-home .bar:nth-child(5) { animation-delay: 0.05s; } .eq-home .bar:nth-child(6) { animation-delay: 0.25s; } .eq-home .bar:nth-child(7) { animation-delay: 0.12s; }
+    @keyframes eqAnim { 0% { height: 4px; } 100% { height: 28px; } }
+    .home-footer { position: relative; z-index: 1; text-align: center; padding: 24px; color: #ffffff33; font-size: 12px; letter-spacing: 1px; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+    #guestPage { display: none; }
+    body::before { content: ''; position: fixed; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(ellipse at 20% 50%, #ff006644 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, #7c3aed44 0%, transparent 50%), radial-gradient(ellipse at 50% 80%, #00d4ff22 0%, transparent 50%); animation: bgPulse 8s ease-in-out infinite alternate; z-index: 0; pointer-events: none; }
+    .header { position: relative; z-index: 1; padding: 32px 20px 24px; text-align: center; border-bottom: 1px solid #ffffff11; }
+    .logo { font-size: 32px; font-weight: 900; letter-spacing: 3px; background: linear-gradient(135deg, #ff006f, #7c3aed, #00d4ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: logoGlow 3s ease-in-out infinite alternate; }
+    @keyframes logoGlow { 0% { filter: drop-shadow(0 0 8px #ff006f88); } 50% { filter: drop-shadow(0 0 12px #7c3aed88); } 100% { filter: drop-shadow(0 0 8px #00d4ff88); } }
+    .dj-name { color: #fff; font-size: 20px; font-weight: 700; margin-top: 6px; letter-spacing: 1px; }
+    .live-badge { display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #ff0044, #ff006f); color: white; font-size: 11px; font-weight: 800; padding: 5px 12px; border-radius: 20px; margin-top: 10px; letter-spacing: 2px; text-transform: uppercase; box-shadow: 0 0 20px #ff004488; animation: livePulse 2s ease-in-out infinite; }
+    .live-dot { width: 6px; height: 6px; background: white; border-radius: 50%; animation: dotBlink 1s ease-in-out infinite; }
+    @keyframes livePulse { 0%, 100% { box-shadow: 0 0 20px #ff004488; } 50% { box-shadow: 0 0 35px #ff004499, 0 0 60px #ff004433; } }
+    @keyframes dotBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    .container { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; padding: 28px 20px; }
+    .section-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 14px; background: linear-gradient(90deg, #ff006f, #7c3aed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .input { width: 100%; background: #ffffff0d; border: 1px solid #ffffff1a; border-radius: 14px; padding: 16px 18px; color: white; font-size: 16px; margin-bottom: 12px; outline: none; transition: all 0.3s; backdrop-filter: blur(10px); font-family: 'DM Sans', sans-serif; }
+    .input:focus { border-color: #7c3aed; background: #ffffff15; box-shadow: 0 0 20px #7c3aed33; }
+    .input::placeholder { color: #ffffff44; }
+    .divider { height: 1px; background: linear-gradient(90deg, transparent, #ffffff22, transparent); margin: 24px 0; }
+    .tip-section { margin-bottom: 8px; }
+    .tip-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+    .tip-btn { background: #ffffff0d; border: 1px solid #ffffff1a; border-radius: 12px; color: #ffffffcc; padding: 14px 8px; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; backdrop-filter: blur(10px); font-family: 'DM Sans', sans-serif; }
+    .tip-btn:active { transform: scale(0.95); }
+    .tip-btn.selected { background: linear-gradient(135deg, #ff006f22, #7c3aed33); border-color: #7c3aed; color: #fff; box-shadow: 0 0 20px #7c3aed44; }
+    .free-badge { background: linear-gradient(135deg, #00ff8811, #00cc6611); border: 1px solid #00ff8844; color: #00ff88; border-radius: 12px; padding: 14px; text-align: center; font-size: 13px; font-weight: 600; margin-bottom: 14px; box-shadow: 0 0 20px #00ff8811; }
+    .tip-required-badge { background: linear-gradient(135deg, #ff444411, #ff006f11); border: 1px solid #ff444444; color: #ff6666; border-radius: 12px; padding: 14px; text-align: center; font-size: 13px; font-weight: 600; margin-bottom: 14px; box-shadow: 0 0 20px #ff444411; }
+
+    #cardSection { display: none; margin-top: 16px; }
+    .card-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: #ffffff55; margin-bottom: 10px; }
+    #card-element { background: #ffffff0d; border: 1px solid #ffffff1a; border-radius: 14px; padding: 16px 18px; margin-bottom: 12px; transition: all 0.3s; }
+    #card-element.focused { border-color: #7c3aed; background: #ffffff15; box-shadow: 0 0 20px #7c3aed33; }
+
+    .submit-btn { width: 100%; background: linear-gradient(135deg, #ff006f, #7c3aed); border: none; border-radius: 16px; color: white; font-size: 18px; font-weight: 800; padding: 20px; cursor: pointer; margin-top: 8px; transition: all 0.3s; letter-spacing: 1px; text-transform: uppercase; box-shadow: 0 4px 30px #ff006f44, 0 4px 30px #7c3aed44; font-family: 'DM Sans', sans-serif; }
+    .submit-btn:active { transform: scale(0.98); }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .status-card { background: #ffffff0d; border: 1px solid #ffffff1a; border-radius: 20px; padding: 32px 24px; text-align: center; margin-top: 24px; backdrop-filter: blur(20px); }
+    .status-icon { font-size: 56px; margin-bottom: 16px; }
+    .status-text { font-size: 22px; font-weight: 800; letter-spacing: 1px; }
+    .status-sub { color: #ffffff88; font-size: 14px; margin-top: 10px; line-height: 1.5; }
+    .follow-card { margin-top: 20px; background: #ffffff0d; border: 1px solid #7c3aed33; border-radius: 20px; padding: 24px 20px; text-align: center; backdrop-filter: blur(20px); box-shadow: 0 0 30px #7c3aed11; }
+    .follow-emoji { font-size: 32px; margin-bottom: 10px; }
+    .follow-title { font-size: 17px; font-weight: 800; margin-bottom: 6px; }
+    .follow-sub { font-size: 13px; color: #ffffff77; margin-bottom: 18px; line-height: 1.5; }
+    .follow-btn { width: 100%; background: linear-gradient(135deg, #00ff88, #00cc66); border: none; border-radius: 14px; color: #000; font-size: 15px; font-weight: 800; padding: 16px; cursor: pointer; letter-spacing: 1px; box-shadow: 0 4px 20px #00ff8844; transition: all 0.2s; font-family: 'DM Sans', sans-serif; }
+    .follow-btn:active { transform: scale(0.98); }
+    .another-btn { width: 100%; background: #ffffff11; border: 1px solid #ffffff22; border-radius: 14px; color: #ffffffcc; font-size: 15px; font-weight: 700; padding: 16px; cursor: pointer; margin-top: 12px; transition: all 0.2s; font-family: 'DM Sans', sans-serif; }
+    .another-btn:active { transform: scale(0.98); }
+    .error { color: #ff6666; font-size: 13px; margin-top: 10px; text-align: center; font-weight: 600; }
+    .eq-bars { display: flex; align-items: flex-end; gap: 3px; justify-content: center; height: 20px; margin-top: 10px; }
+    .eq-bar { width: 3px; background: linear-gradient(to top, #ff006f, #7c3aed); border-radius: 2px; animation: eqAnim 0.8s ease-in-out infinite alternate; }
+    .eq-bar:nth-child(1) { animation-delay: 0s; } .eq-bar:nth-child(2) { animation-delay: 0.1s; } .eq-bar:nth-child(3) { animation-delay: 0.2s; } .eq-bar:nth-child(4) { animation-delay: 0.15s; } .eq-bar:nth-child(5) { animation-delay: 0.05s; }
+  </style>
+</head>
+<body>
+
+<div id="homePage">
+  <div class="home-bg"></div>
+  <div class="home-content">
+    <nav class="home-nav">
+      <div class="nav-logo">PRIMEDJ</div>
+      <a href="https://primedj-server-production.up.railway.app" class="nav-dj-btn">DJ LOGIN →</a>
+    </nav>
+    <div class="hero">
+      <div class="hero-eyebrow">🎧 The DJ Platform Built by a DJ</div>
+      <div class="hero-title"><span class="grad">PRIME</span><br>DJ</div>
+      <p class="hero-sub"><strong>Request songs. Tip your DJ. Connect with the crowd.</strong><br>Scan your DJ's QR code at the event to get started.</p>
+      <div class="qr-card">
+        <span class="qr-icon">📲</span>
+        <h2>SCAN TO REQUEST</h2>
+        <p>Your DJ will display a <strong>QR code</strong> at the event. Scan it with your phone to request songs and tip directly — no app download needed.</p>
+        <div class="pill-row">
+          <span class="pill green">✓ Free to use</span>
+          <span class="pill pink">✓ Instant tips</span>
+          <span class="pill cyan">✓ No app needed</span>
+        </div>
+        <a href="https://apps.apple.com/app/primedj/id6776764992" class="dj-cta">Are You a DJ? Download the App →</a>
+      </div>
+      <div class="eq-home">
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      </div>
+    </div>
+  </div>
+  <div class="home-footer">© 2026 PRIMEDJ · DESI BY NATURE INC · HOUSTON, TX</div>
+</div>
+
+<div id="guestPage">
+  <div class="header">
+    <div class="logo">🎵 PRIMEDJ</div>
+    <div class="dj-name" id="djName">Loading...</div>
+    <div class="live-badge"><div class="live-dot"></div> LIVE</div>
+    <div class="eq-bars">
+      <div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div>
+      <div class="eq-bar"></div><div class="eq-bar"></div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div id="requestForm">
+      <div class="section-title">🎶 Request a Song</div>
+      <input class="input" id="songName" placeholder="Song name *" type="text" />
+      <input class="input" id="artistName" placeholder="Artist (optional)" type="text" />
+      <input class="input" id="guestName" placeholder="Your name (optional)" type="text" />
+      <input class="input" id="message" placeholder="Message to DJ (optional)" type="text" />
+
+      <div class="divider"></div>
+
+      <div class="tip-section">
+        <div class="section-title">💸 Boost Your Request</div>
+        <div id="freeRequestBadge" class="free-badge" style="display:none">🎉 First request is on us! Tip optional.</div>
+        <div id="tipRequiredBadge" class="tip-required-badge" style="display:none">💳 Free request used — add a tip to send another!</div>
+        <div class="tip-grid">
+          <button class="tip-btn" id="skipBtn" onclick="selectTip(0, event)">Skip</button>
+          <button class="tip-btn" onclick="selectTip(2, event)">$2</button>
+          <button class="tip-btn" onclick="selectTip(5, event)">$5</button>
+          <button class="tip-btn" onclick="selectTip(10, event)">$10</button>
+        </div>
+        <input class="input" id="customTip" placeholder="Custom tip amount $" type="number" min="1" />
+      </div>
+
+      <!-- Card form — appears when tip selected -->
+      <div id="cardSection">
+        <div class="card-label">💳 Card Details</div>
+        <div id="card-element"></div>
+      </div>
+
+      <button class="submit-btn" id="submitBtn" onclick="submitRequest()">Send Request 🎵</button>
+      <div class="error" id="errorMsg"></div>
+    </div>
+
+    <div id="statusCard" style="display:none">
+      <div class="status-card">
+        <div class="status-icon" id="statusIcon">⏳</div>
+        <div class="status-text" id="statusText">Request Sent!</div>
+        <div class="status-sub" id="statusSub">Waiting for DJ to respond...</div>
+      </div>
+      <div class="follow-card">
+        <div class="follow-emoji">🎧</div>
+        <div class="follow-title">Love the vibe?</div>
+        <div class="follow-sub">Follow <span id="followDjName"></span> to get notified about upcoming events!</div>
+        <input class="input" id="followEmail" placeholder="Your email address" type="email" />
+        <button class="follow-btn" onclick="followDJ()">Follow DJ 🎵</button>
+        <div id="followSuccess" style="display:none; color:#00ff88; margin-top:12px; font-size:14px; font-weight:700;">✅ You're now following this DJ!</div>
+      </div>
+      <button class="another-btn" onclick="resetForm()">Request Another Song 🎶</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API = 'https://primedj-server-production.up.railway.app';
+  const STRIPE_KEY = 'pk_live_51TcD3a2M2CpXORVZBc4BcBWDWC3yvXwOYQCQJpQ0RTe5mja98SHrimXfRI1Ks5duIjmeBJHHCgkWg2GSYqWrujAT00phBqRqRc';
+
+  const pathParts = window.location.pathname.split('/').filter(Boolean);
+  const isDJPage = pathParts[0] === 'dj' && pathParts[1];
+  const djId = isDJPage ? pathParts[1] : null;
+
+  if (isDJPage) {
+    document.getElementById('guestPage').style.display = 'block';
+    initGuestPage();
+  } else {
+    document.getElementById('homePage').style.display = 'block';
+  }
+
+  function initGuestPage() {
+    const stripe = Stripe(STRIPE_KEY);
+    const elements = stripe.elements();
+
+    const cardElement = elements.create('card', {
+      style: {
+        base: {
+          color: '#ffffff',
+          fontFamily: 'DM Sans, sans-serif',
+          fontSize: '16px',
+          fontSmoothing: 'antialiased',
+          '::placeholder': { color: '#ffffff44' },
+          iconColor: '#7c3aed',
+        },
+        invalid: { color: '#ff6666', iconColor: '#ff6666' },
+      },
+      hidePostalCode: true,
+    });
+    cardElement.mount('#card-element');
+    cardElement.on('focus', () => document.getElementById('card-element').classList.add('focused'));
+    cardElement.on('blur',  () => document.getElementById('card-element').classList.remove('focused'));
+
+    let selectedTip = 0;
+    let requestId = null;
+    let statusInterval = null;
+    let currentDjId = null;
+    let freeRequestUsed = false;
+
+    function checkFreeRequest() {
+      freeRequestUsed = localStorage.getItem(`freeRequest_${djId}`) === 'true';
+      if (freeRequestUsed) {
+        document.getElementById('freeRequestBadge').style.display = 'none';
+        document.getElementById('tipRequiredBadge').style.display = 'block';
+        document.getElementById('skipBtn').style.display = 'none';
+        selectedTip = 0;
+      } else {
+        document.getElementById('freeRequestBadge').style.display = 'block';
+        document.getElementById('tipRequiredBadge').style.display = 'none';
+        document.getElementById('skipBtn').style.display = 'block';
+      }
+    }
+
+    function markFreeRequestUsed() {
+      localStorage.setItem(`freeRequest_${djId}`, 'true');
+      freeRequestUsed = true;
+    }
+
+    function updateCardVisibility() {
+      const customTip = parseFloat(document.getElementById('customTip').value) || 0;
+      const tip = customTip || selectedTip;
+      document.getElementById('cardSection').style.display = tip > 0 ? 'block' : 'none';
+      document.getElementById('submitBtn').textContent = tip > 0 ? `Pay $${tip} & Send Request 💳` : 'Send Request 🎵';
+    }
+
+    window.selectTip = function(amount, event) {
+      selectedTip = amount;
+      document.querySelectorAll('.tip-btn').forEach(b => b.classList.remove('selected'));
+      event.target.classList.add('selected');
+      document.getElementById('customTip').value = '';
+      updateCardVisibility();
+    };
+
+    document.getElementById('customTip').addEventListener('input', () => {
+      selectedTip = 0;
+      document.querySelectorAll('.tip-btn').forEach(b => b.classList.remove('selected'));
+      updateCardVisibility();
+    });
+
+    async function saveRequest(tipAmount, paymentIntentId = null) {
+      const songName   = document.getElementById('songName').value.trim();
+      const artistName = document.getElementById('artistName').value.trim();
+      const guestName  = document.getElementById('guestName').value.trim();
+      const message    = document.getElementById('message').value.trim();
+      const res = await fetch(`${API}/requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ djId: currentDjId || djId, songName, artistName, guestName, message, tipAmount, paymentIntentId })
+      });
+      const data = await res.json();
+      requestId = data.id;
+      markFreeRequestUsed();
+      document.getElementById('requestForm').style.display = 'none';
+      document.getElementById('statusCard').style.display = 'block';
+      statusInterval = setInterval(checkStatus, 5000);
+    }
+
+    window.submitRequest = async function() {
+      const songName  = document.getElementById('songName').value.trim();
+      const customTip = parseFloat(document.getElementById('customTip').value) || 0;
+      const tipAmount = customTip || selectedTip;
+      if (!songName) { document.getElementById('errorMsg').textContent = 'Please enter a song name!'; return; }
+      if (freeRequestUsed && tipAmount === 0) { document.getElementById('errorMsg').textContent = 'Add a tip to send another request!'; return; }
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Processing...';
+      document.getElementById('errorMsg').textContent = '';
+      try {
+        if (tipAmount > 0) {
+          const res = await fetch(`${API}/create-payment-intent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: tipAmount }),
+          });
+          const { clientSecret } = await res.json();
+          const { paymentIntent, error } = await stripe.confirmCardPayment(clientSecret, {
+            payment_method: { card: cardElement }
+          });
+          if (error) {
+            document.getElementById('errorMsg').textContent = error.message;
+            btn.disabled = false;
+            btn.textContent = `Pay $${tipAmount} & Send Request 💳`;
+            return;
+          }
+          await saveRequest(tipAmount, paymentIntent.id);
+        } else {
+          await saveRequest(0);
+        }
+      } catch (e) {
+        document.getElementById('errorMsg').textContent = 'Something went wrong. Try again!';
+        btn.disabled = false;
+        btn.textContent = tipAmount > 0 ? `Pay $${tipAmount} & Send Request 💳` : 'Send Request 🎵';
+      }
+    };
+
+    async function loadDJ() {
+      try {
+        const res = await fetch(`${API}/dj/${djId}`);
+        const dj = await res.json();
+        currentDjId = dj.id;
+        document.getElementById('djName').textContent = dj.name;
+        document.getElementById('followDjName').textContent = dj.name;
+      } catch (e) {
+        document.getElementById('djName').textContent = 'PrimeDJ';
+      }
+      checkFreeRequest();
+      updateCardVisibility();
+    }
+
+    async function checkStatus() {
+      if (!requestId) return;
+      try {
+        const res = await fetch(`${API}/request-status/${requestId}`);
+        const data = await res.json();
+        updateStatusUI(data.status);
+      } catch (e) {}
+    }
+
+    function updateStatusUI(status) {
+      const icons = { pending: '⏳', accepted: '✅', declined: '❌', played: '🎵' };
+      const texts = { pending: 'Request Sent!', accepted: 'Request Accepted!', declined: 'Not This Time', played: 'Now Playing! 🔥' };
+      const subs  = { pending: 'Waiting for DJ to respond...', accepted: 'Your song is in the queue!', declined: 'DJ passed on this one. Try another!', played: 'The DJ is playing your song!' };
+      document.getElementById('statusIcon').textContent = icons[status] || '⏳';
+      document.getElementById('statusText').textContent = texts[status] || 'Pending';
+      document.getElementById('statusSub').textContent  = subs[status]  || '';
+      if (status === 'declined' || status === 'played') clearInterval(statusInterval);
+    }
+
+    window.followDJ = async function() {
+      const email = document.getElementById('followEmail').value.trim();
+      if (!email) return;
+      try {
+        await fetch(`${API}/follow`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ djId: currentDjId || djId, email })
+        });
+        document.getElementById('followEmail').style.display = 'none';
+        document.querySelector('.follow-btn').style.display = 'none';
+        document.getElementById('followSuccess').style.display = 'block';
+      } catch (e) { console.error(e); }
+    };
+
+    window.resetForm = function() {
+      clearInterval(statusInterval);
+      requestId = null;
+      selectedTip = 0;
+      ['songName','artistName','guestName','message','customTip','followEmail'].forEach(id => { document.getElementById(id).value = ''; });
+      document.querySelectorAll('.tip-btn').forEach(b => b.classList.remove('selected'));
+      cardElement.clear();
+      document.getElementById('followSuccess').style.display = 'none';
+      document.getElementById('followEmail').style.display = 'block';
+      document.querySelector('.follow-btn').style.display = 'block';
+      document.getElementById('submitBtn').disabled = false;
+      document.getElementById('requestForm').style.display = 'block';
+      document.getElementById('statusCard').style.display = 'none';
+      checkFreeRequest();
+      updateCardVisibility();
+    };
+
+    loadDJ();
+  }
+</script>
+</body>
+</html>
