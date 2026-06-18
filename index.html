@@ -133,7 +133,8 @@
   <div class="header">
     <div class="logo">🎵 PRIMEDJ</div>
     <div class="dj-name" id="djName">Loading...</div>
-    <div class="live-badge"><div class="live-dot"></div> LIVE</div>
+    <div id="liveBadge" class="live-badge" style="display:none"><div class="live-dot"></div> LIVE</div>
+    <div id="offlineBadge" style="display:none;background:#2a2a38;color:#6b6b80;font-size:11px;font-weight:800;padding:5px 12px;border-radius:20px;margin-top:10px;letter-spacing:2px;text-transform:uppercase;">⚫ OFFLINE</div>
     <div class="eq-bars">
       <div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div>
       <div class="eq-bar"></div><div class="eq-bar"></div>
@@ -333,11 +334,18 @@
 
     async function loadDJ() {
       try {
-        const res = await fetch(`${API}/dj/${djId}`);
+        const res = await fetch(`${API}/dj/${djId}?t=${Date.now()}`);
         const dj = await res.json();
         currentDjId = dj.id;
         document.getElementById('djName').textContent = dj.name;
         document.getElementById('followDjName').textContent = dj.name;
+        if (dj.isLive) {
+          document.getElementById('liveBadge').style.display = 'inline-flex';
+          document.getElementById('offlineBadge').style.display = 'none';
+        } else {
+          document.getElementById('liveBadge').style.display = 'none';
+          document.getElementById('offlineBadge').style.display = 'inline-flex';
+        }
       } catch (e) {
         document.getElementById('djName').textContent = 'PrimeDJ';
       }
