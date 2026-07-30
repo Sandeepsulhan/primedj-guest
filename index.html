@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PrimeDJ — Request. Tip. Connect.</title>
-  <script src="https://js.stripe.com/v3/"></script>
+  <script src="https://www.paypal.com/sdk/js?client-id=AUL2Kml7dutWTNwhMk853GHF-WsQ3lfUYW0hrUYCpd8MBtIvPLuKOopaU35KhxJDtwpWntxAJ93S1seD&currency=USD&merchant-id=*"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
@@ -72,8 +72,7 @@
 
     #cardSection { display: none; margin-top: 16px; }
     .card-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: #ffffff55; margin-bottom: 10px; }
-    #card-element { background: #ffffff0d; border: 1px solid #ffffff1a; border-radius: 14px; padding: 16px 18px; margin-bottom: 12px; transition: all 0.3s; }
-    #card-element.focused { border-color: #7c3aed; background: #ffffff15; box-shadow: 0 0 20px #7c3aed33; }
+    #paypal-button-container { min-height: 45px; margin-bottom: 12px; }
 
     .submit-btn { width: 100%; background: linear-gradient(135deg, #ff006f, #7c3aed); border: none; border-radius: 16px; color: white; font-size: 18px; font-weight: 800; padding: 20px; cursor: pointer; margin-top: 8px; transition: all 0.3s; letter-spacing: 1px; text-transform: uppercase; box-shadow: 0 4px 30px #ff006f44, 0 4px 30px #7c3aed44; font-family: 'DM Sans', sans-serif; }
     .submit-btn:active { transform: scale(0.98); }
@@ -164,10 +163,10 @@
         <input class="input" id="customTip" placeholder="Custom tip amount $" type="number" min="1" />
       </div>
 
-      <!-- Card form — appears when tip selected -->
+      <!-- PayPal buttons — appear when tip selected -->
       <div id="cardSection">
-        <div class="card-label">💳 Card Details</div>
-        <div id="card-element"></div>
+        <div class="card-label">💳 Complete Your Tip</div>
+        <div id="paypal-button-container"></div>
       </div>
 
       <p style="font-size: 12px; color: #ffffff80; text-align: center; margin: 10px 0; line-height: 1.4;">Once accepted, your song joins the DJ's live queue — exact play time is at their discretion. Declined requests are refunded instantly.</p>
@@ -197,7 +196,6 @@
 
 <script>
   const API = 'https://primedj-server-production.up.railway.app';
-  const STRIPE_KEY = 'pk_live_51TcD3a2M2CpXORVZBc4BcBWDWC3yvXwOYQCQJpQ0RTe5mja98SHrimXfRI1Ks5duIjmeBJHHCgkWg2GSYqWrujAT00phBqRqRc';
 
   const pathParts = window.location.pathname.split('/').filter(Boolean);
   const isDJPage = pathParts[0] === 'dj' && pathParts[1];
@@ -211,33 +209,13 @@
   }
 
   function initGuestPage() {
-    const stripe = Stripe(STRIPE_KEY);
-    const elements = stripe.elements();
-
-    const cardElement = elements.create('card', {
-      style: {
-        base: {
-          color: '#ffffff',
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: '16px',
-          fontSmoothing: 'antialiased',
-          '::placeholder': { color: '#ffffff44' },
-          iconColor: '#7c3aed',
-        },
-        invalid: { color: '#ff6666', iconColor: '#ff6666' },
-      },
-      hidePostalCode: true,
-    });
-    cardElement.mount('#card-element');
-    cardElement.on('focus', () => document.getElementById('card-element').classList.add('focused'));
-    cardElement.on('blur',  () => document.getElementById('card-element').classList.remove('focused'));
-
     let selectedTip = 0;
     let requestId = null;
     let statusInterval = null;
     let currentDjId = null;
-    let currentDjStripeAccountId = null;
+    let currentDjPaypalMerchantId = null;
     let freeRequestUsed = false;
+    let paypalButtonsRendered = false;
 
     function checkFreeRequest() {
       freeRequestUsed = localStorage.getItem(`freeRequest_${djId}`) === 'true';
@@ -258,11 +236,73 @@
       freeRequestUsed = true;
     }
 
-    function updateCardVisibility() {
+    function getCurrentTip() {
       const customTip = parseFloat(document.getElementById('customTip').value) || 0;
-      const tip = customTip || selectedTip;
-      document.getElementById('cardSection').style.display = tip > 0 ? 'block' : 'none';
-      document.getElementById('submitBtn').textContent = tip > 0 ? `Pay $${tip} & Send Request 💳` : 'Send Request 🎵';
+      return customTip || selectedTip;
+    }
+
+    function renderPaypalButtons() {
+      const container = document.getElementById('paypal-button-container');
+      container.innerHTML = '';
+      paypal.Buttons({
+        style: { layout: 'horizontal', height: 45 },
+        createOrder: async function() {
+          const songName = document.getElementById('songName').value.trim();
+          if (!songName) {
+            document.getElementById('errorMsg').textContent = 'Please enter a song name first!';
+            throw new Error('No song name');
+          }
+          const tipAmount = getCurrentTip();
+          const res = await fetch(`${API}/api/paypal/create-order`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              djId: currentDjId || djId,
+              djPaypalMerchantId: currentDjPaypalMerchantId,
+              tipAmount,
+            }),
+          });
+          const data = await res.json();
+          return data.orderId;
+        },
+        onApprove: async function(data) {
+          const res = await fetch(`${API}/api/paypal/capture-order`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId: data.orderID }),
+          });
+          const captureData = await res.json();
+          const tipAmount = getCurrentTip();
+          await saveRequest(tipAmount, captureData.id);
+        },
+        onError: function(err) {
+          console.error('PayPal error:', err);
+          document.getElementById('errorMsg').textContent = 'Payment failed. Please try again.';
+        },
+      }).render('#paypal-button-container');
+    }
+
+    // NOTE: PayPal buttons now render for any tip amount, regardless of
+    // whether the DJ has a paypalMerchantId on file. In the current batched
+    // payout model, guest tips always go to the platform's own PayPal
+    // Business account first, then get disbursed to DJs later via
+    // /api/paypal/run-payouts — so there's no need to gate checkout on a
+    // per-DJ merchant ID (that's only needed for real-time multiparty
+    // splits once the Partner Program application is approved).
+    function updateCardVisibility() {
+      const tip = getCurrentTip();
+      if (tip > 0) {
+        document.getElementById('cardSection').style.display = 'block';
+        document.getElementById('submitBtn').style.display = 'none';
+        if (!paypalButtonsRendered) {
+          renderPaypalButtons();
+          paypalButtonsRendered = true;
+        }
+      } else {
+        document.getElementById('cardSection').style.display = 'none';
+        document.getElementById('submitBtn').style.display = 'block';
+        document.getElementById('submitBtn').textContent = 'Send Request 🎵';
+      }
     }
 
     window.selectTip = function(amount, event) {
@@ -298,40 +338,21 @@
     }
 
     window.submitRequest = async function() {
+      // Only reached for free (tip = 0) requests — paid tips go through PayPal buttons above.
       const songName  = document.getElementById('songName').value.trim();
-      const customTip = parseFloat(document.getElementById('customTip').value) || 0;
-      const tipAmount = customTip || selectedTip;
+      const tipAmount = getCurrentTip();
       if (!songName) { document.getElementById('errorMsg').textContent = 'Please enter a song name!'; return; }
       if (freeRequestUsed && tipAmount === 0) { document.getElementById('errorMsg').textContent = 'Add a tip to send another request!'; return; }
       const btn = document.getElementById('submitBtn');
       btn.disabled = true;
-      btn.textContent = 'Processing...';
+      btn.textContent = 'Sending...';
       document.getElementById('errorMsg').textContent = '';
       try {
-        if (tipAmount > 0) {
-          const res = await fetch(`${API}/create-payment-intent`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount: tipAmount, stripeAccountId: currentDjStripeAccountId }),
-          });
-          const { clientSecret } = await res.json();
-          const { paymentIntent, error } = await stripe.confirmCardPayment(clientSecret, {
-            payment_method: { card: cardElement }
-          });
-          if (error) {
-            document.getElementById('errorMsg').textContent = error.message;
-            btn.disabled = false;
-            btn.textContent = `Pay $${tipAmount} & Send Request 💳`;
-            return;
-          }
-          await saveRequest(tipAmount, paymentIntent.id);
-        } else {
-          await saveRequest(0);
-        }
+        await saveRequest(0);
       } catch (e) {
         document.getElementById('errorMsg').textContent = 'Something went wrong. Try again!';
         btn.disabled = false;
-        btn.textContent = tipAmount > 0 ? `Pay $${tipAmount} & Send Request 💳` : 'Send Request 🎵';
+        btn.textContent = 'Send Request 🎵';
       }
     };
 
@@ -340,7 +361,7 @@
         const res = await fetch(`${API}/dj/${djId}?t=${Date.now()}`);
         const dj = await res.json();
         currentDjId = dj.id;
-        currentDjStripeAccountId = dj.stripeAccountId || null;
+        currentDjPaypalMerchantId = dj.paypalMerchantId || null;
         document.getElementById('djName').textContent = dj.name;
         document.getElementById('followDjName').textContent = dj.name;
         if (dj.isLive) {
@@ -397,7 +418,6 @@
       selectedTip = 0;
       ['songName','artistName','guestName','message','customTip','followEmail'].forEach(id => { document.getElementById(id).value = ''; });
       document.querySelectorAll('.tip-btn').forEach(b => b.classList.remove('selected'));
-      cardElement.clear();
       document.getElementById('followSuccess').style.display = 'none';
       document.getElementById('followEmail').style.display = 'block';
       document.querySelector('.follow-btn').style.display = 'block';
