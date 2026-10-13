@@ -161,6 +161,11 @@
           <button class="tip-btn" onclick="selectTip(10, event)">$10</button>
         </div>
         <input class="input" id="customTip" placeholder="Custom tip amount $" type="number" min="1" />
+        <div id="promoRow" style="display:flex;gap:10px;margin-bottom:12px;">
+          <input class="input" id="promoCode" placeholder="Promo code (optional)" type="text" autocapitalize="characters" style="margin-bottom:0;" />
+          <button class="tip-btn" id="promoBtn" onclick="applyPromo()" style="white-space:nowrap;padding:0 18px;">Apply</button>
+        </div>
+        <div id="promoMsg" style="display:none;font-size:13px;font-weight:600;margin-bottom:12px;text-align:center;"></div>
       </div>
 
       <!-- PayPal buttons — appear when tip selected -->
@@ -216,9 +221,42 @@
     let currentDjPaypalMerchantId = null;
     let freeRequestUsed = false;
     let paypalButtonsRendered = false;
+    let promoApplied = false;
+    let appliedPromoCode = '';
+
+    window.applyPromo = async function() {
+      const code = document.getElementById('promoCode').value.trim();
+      const msg = document.getElementById('promoMsg');
+      if (!code) return;
+      msg.style.display = 'block';
+      try {
+        const res = await fetch(`${API}/api/promo/validate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, djId: currentDjId || djId }),
+        });
+        const data = await res.json();
+        if (data.valid) {
+          promoApplied = true;
+          appliedPromoCode = code;
+          msg.style.color = '#00ff88';
+          msg.textContent = '🎉 Promo applied — request as many songs as you like, no tip needed!';
+          document.getElementById('promoRow').style.display = 'none';
+        } else {
+          promoApplied = false;
+          appliedPromoCode = '';
+          msg.style.color = '#ff6666';
+          msg.textContent = res.status === 429 ? 'Too many attempts. Try again in a minute.' : 'That code isn’t valid.';
+        }
+      } catch (e) {
+        msg.style.color = '#ff6666';
+        msg.textContent = 'Could not check the code. Try again.';
+      }
+      checkFreeRequest();
+    };
 
     function checkFreeRequest() {
-      freeRequestUsed = localStorage.getItem(`freeRequest_${djId}`) === 'true';
+      freeRequestUsed = !promoApplied && localStorage.getItem(`freeRequest_${djId}`) === 'true';
       if (freeRequestUsed) {
         document.getElementById('freeRequestBadge').style.display = 'none';
         document.getElementById('tipRequiredBadge').style.display = 'block';
@@ -324,14 +362,16 @@
       const artistName = document.getElementById('artistName').value.trim();
       const guestName  = document.getElementById('guestName').value.trim();
       const message    = document.getElementById('message').value.trim();
+      const usePromo = promoApplied && !paymentIntentId;
       const res = await fetch(`${API}/requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ djId: currentDjId || djId, songName, artistName, guestName, message, tipAmount, paymentIntentId })
+        body: JSON.stringify({ djId: currentDjId || djId, songName, artistName, guestName, message, tipAmount, paymentIntentId, ...(usePromo ? { promoCode: appliedPromoCode } : {}) })
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Request failed');
       requestId = data.id;
-      markFreeRequestUsed();
+      if (!usePromo) markFreeRequestUsed();
       document.getElementById('requestForm').style.display = 'none';
       document.getElementById('statusCard').style.display = 'block';
       statusInterval = setInterval(checkStatus, 5000);
@@ -342,7 +382,7 @@
       const songName  = document.getElementById('songName').value.trim();
       const tipAmount = getCurrentTip();
       if (!songName) { document.getElementById('errorMsg').textContent = 'Please enter a song name!'; return; }
-      if (freeRequestUsed && tipAmount === 0) { document.getElementById('errorMsg').textContent = 'Add a tip to send another request!'; return; }
+      if (freeRequestUsed && !promoApplied && tipAmount === 0) { document.getElementById('errorMsg').textContent = 'Add a tip to send another request!'; return; }
       const btn = document.getElementById('submitBtn');
       btn.disabled = true;
       btn.textContent = 'Sending...';
